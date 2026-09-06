@@ -1,0 +1,21 @@
+{
+  "name": "ai-chatbot-backend",
+  "version": "2.0.0",
+  "description": "AI Chatbot using LangChain, OpenRouter, vision, files and voice features",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@langchain/core": "latest",
+    "@langchain/openai": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "mammoth": "latest",
+    "multer": "latest",
+    "pdf-parse": "^1.1.1"
+  }
+}
