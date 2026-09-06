@@ -1,4 +1,4 @@
-# AI Assistant — Feature Upgrade
+# Built my own AI Assistant
 
 This version adds:
 
@@ -22,16 +22,5 @@ npm start
 ```
 
 4. Open `http://localhost:5000`.
-
-## Environment variables
-
-```env
-OPENROUTER_API_KEY=your_key_here
-PORT=5000
-MODEL=minimax/minimax-m3:free
-VISION_MODEL=google/gemma-4-26b-a4b-it:free
-```
-
-`MODEL` is used for normal text chat. `VISION_MODEL` is used when an image is attached.
 
 Voice input and text-to-speech are browser features, so they do not require another API key. Browser permissions may be requested for microphone access.
