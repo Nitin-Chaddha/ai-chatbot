@@ -1,1 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#070b14">
+  <title>AI Assistant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-icon">AI</div>
+        <div class="brand-text">
+          <h2>AI Assistant</h2>
+          <p>Free AI Chatbot</p>
+        </div>
+      </div>
+
+      <button id="newChatButton" class="new-chat-button" type="button">
+        <span>+</span> New Chat
+      </button>
+
+      <div class="history-heading">
+        <span>Recent chats</span>
+        <button id="clearHistoryButton" class="icon-mini-button" type="button" title="Delete saved chats">⌫</button>
+      </div>
+      <div id="chatHistory" class="chat-history"></div>
+
+      <div class="sidebar-info">
+        <p>LangChain.js</p>
+        <p>OpenRouter</p>
+        <p>MiniMax M3</p>
+        <p>Vision + Voice enabled</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="header">
+        <div class="header-left">
+          <button id="menuButton" class="mobile-menu-button" type="button" aria-label="Open menu">☰</button>
+          <div>
+            <h1>AI Assistant</h1>
+            <p id="chatSubtitle">Ask me anything</p>
+          </div>
+        </div>
+        <button id="clearButton" class="clear-button" type="button">Clear</button>
+      </header>
+
+      <section id="messages" class="messages"></section>
+
+      <div id="attachmentPreview" class="attachment-preview hidden"></div>
+
+      <div class="input-area">
+        <div class="input-box">
+          <input id="fileInput" type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.csv,.json,.js,.html,.css,.xml,.pdf,.docx">
+          <button id="attachButton" class="tool-button" type="button" title="Attach file">📎</button>
+
+          <textarea id="messageInput" placeholder="Message AI Assistant..." rows="1"></textarea>
+
+          <button id="micButton" class="tool-button" type="button" title="Voice input" aria-label="Voice input">🎤</button>
+          <button id="sendButton" class="send-button" type="button" aria-label="Send message">➤</button>
+        </div>
+
+        <div id="voiceStatus" class="voice-status hidden">Listening… speak now</div>
+        <p class="disclaimer">AI can make mistakes. Verify important information.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
