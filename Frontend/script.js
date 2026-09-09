@@ -2,6 +2,7 @@ const API_URL = "/api/chat";
 const EXTRACT_URL = "/api/extract-file";
 
 const STORAGE_KEY = "aiAssistantConversationsV2";
+
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 const MAX_TEXT_CHARS = 60000;
 
@@ -9,26 +10,48 @@ const MAX_TEXT_CHARS = 60000;
 // DOM ELEMENTS
 // =====================================================
 
-const messagesContainer = document.getElementById("messages");
-const input = document.getElementById("messageInput");
-const sendButton = document.getElementById("sendButton");
+const messagesContainer =
+    document.getElementById("messages");
 
-const clearButton = document.getElementById("clearButton");
-const newChatButton = document.getElementById("newChatButton");
-const chatHistory = document.getElementById("chatHistory");
+const input =
+    document.getElementById("messageInput");
+
+const sendButton =
+    document.getElementById("sendButton");
+
+const clearButton =
+    document.getElementById("clearButton");
+
+const newChatButton =
+    document.getElementById("newChatButton");
+
+const chatHistory =
+    document.getElementById("chatHistory");
+
 const clearHistoryButton =
     document.getElementById("clearHistoryButton");
 
-const fileInput = document.getElementById("fileInput");
-const attachButton = document.getElementById("attachButton");
+const fileInput =
+    document.getElementById("fileInput");
+
+const attachButton =
+    document.getElementById("attachButton");
+
 const attachmentPreview =
     document.getElementById("attachmentPreview");
 
-const micButton = document.getElementById("micButton");
-const voiceStatus = document.getElementById("voiceStatus");
+const micButton =
+    document.getElementById("micButton");
 
-const menuButton = document.getElementById("menuButton");
-const sidebar = document.getElementById("sidebar");
+const voiceStatus =
+    document.getElementById("voiceStatus");
+
+const menuButton =
+    document.getElementById("menuButton");
+
+const sidebar =
+    document.getElementById("sidebar");
+
 const sidebarOverlay =
     document.getElementById("sidebarOverlay");
 
@@ -40,12 +63,15 @@ const chatSubtitle =
 // =====================================================
 
 let conversations = loadConversations();
+
 let currentConversation = null;
 
 let pendingAttachment = null;
 
 let recognition = null;
+
 let isListening = false;
+
 let isSending = false;
 
 // =====================================================
@@ -61,7 +87,8 @@ function loadConversations() {
             return [];
         }
 
-        const parsed = JSON.parse(saved);
+        const parsed =
+            JSON.parse(saved);
 
         return Array.isArray(parsed)
             ? parsed
@@ -92,41 +119,43 @@ function saveConversations() {
     } catch (error) {
 
         console.warn(
-            "Could not save complete chat history:",
+            "Could not save complete history:",
             error
         );
 
         try {
 
             const reduced =
-                conversations.map(chat => ({
-                    ...chat,
+                conversations.map(
+                    chat => ({
+                        ...chat,
 
-                    lastImage: null,
+                        lastImage: null,
 
-                    messages:
-                        chat.messages.map(
-                            message => ({
-                                ...message,
+                        messages:
+                            chat.messages.map(
+                                message => ({
+                                    ...message,
 
-                                attachment:
-                                    message
-                                        .attachment
-                                        ?.type ===
-                                    "image"
-                                        ? {
-                                              type:
-                                                  "image",
+                                    attachment:
+                                        message
+                                            .attachment
+                                            ?.type ===
+                                        "image"
+                                            ? {
+                                                  type:
+                                                      "image",
 
-                                              name:
-                                                  message
-                                                      .attachment
-                                                      .name
-                                          }
-                                        : message.attachment
-                            })
-                        )
-                }));
+                                                  name:
+                                                      message
+                                                          .attachment
+                                                          .name
+                                              }
+                                            : message.attachment
+                                })
+                            )
+                    })
+                );
 
             localStorage.setItem(
                 STORAGE_KEY,
@@ -138,7 +167,7 @@ function saveConversations() {
         } catch (secondError) {
 
             console.error(
-                "Could not save chat history:",
+                "Could not save history:",
                 secondError
             );
         }
@@ -149,7 +178,7 @@ function saveConversations() {
 // HELPERS
 // =====================================================
 
-function makeId(prefix = "id") {
+function makeId(prefix) {
 
     return (
         prefix +
@@ -162,14 +191,29 @@ function makeId(prefix = "id") {
     );
 }
 
-function escapeHtml(text) {
+function escapeHtml(value) {
 
-    return String(text ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(value ?? "")
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 }
 
 function formatText(text) {
@@ -179,34 +223,38 @@ function formatText(text) {
     }
 
     let safe =
-        escapeHtml(String(text));
+        escapeHtml(text);
 
-    safe = safe.replace(
-        /```([\s\S]*?)```/g,
-        (_, code) =>
-            `<pre><code>${code.trim()}</code></pre>`
-    );
+    safe =
+        safe.replace(
+            /```([\s\S]*?)```/g,
+            (_, code) =>
+                `<pre><code>${code.trim()}</code></pre>`
+        );
 
-    safe = safe.replace(
-        /`([^`]+)`/g,
-        "<code>$1</code>"
-    );
+    safe =
+        safe.replace(
+            /`([^`]+)`/g,
+            "<code>$1</code>"
+        );
 
-    safe = safe.replace(
-        /\*\*([^*]+)\*\*/g,
-        "<strong>$1</strong>"
-    );
+    safe =
+        safe.replace(
+            /\*\*([^*]+)\*\*/g,
+            "<strong>$1</strong>"
+        );
 
-    safe = safe.replace(
-        /\n/g,
-        "<br>"
-    );
+    safe =
+        safe.replace(
+            /\n/g,
+            "<br>"
+        );
 
     return safe;
 }
 
 // =====================================================
-// CREATE CONVERSATION
+// CONVERSATIONS
 // =====================================================
 
 function createConversation() {
@@ -217,7 +265,8 @@ function createConversation() {
 
         title: "New Chat",
 
-        sessionId: makeId("session"),
+        sessionId:
+            makeId("session"),
 
         messages: [],
 
@@ -244,10 +293,6 @@ function ensureConversation() {
     }
 }
 
-// =====================================================
-// START NEW CHAT
-// =====================================================
-
 function startNewChat() {
 
     currentConversation =
@@ -257,7 +302,8 @@ function startNewChat() {
         currentConversation
     );
 
-    pendingAttachment = null;
+    pendingAttachment =
+        null;
 
     clearAttachmentPreview();
 
@@ -274,10 +320,6 @@ function startNewChat() {
     }
 }
 
-// =====================================================
-// SELECT CHAT
-// =====================================================
-
 function selectConversation(id) {
 
     const found =
@@ -290,9 +332,11 @@ function selectConversation(id) {
         return;
     }
 
-    currentConversation = found;
+    currentConversation =
+        found;
 
-    pendingAttachment = null;
+    pendingAttachment =
+        null;
 
     clearAttachmentPreview();
 
@@ -305,11 +349,7 @@ function selectConversation(id) {
     }
 }
 
-// =====================================================
-// UPDATE CHAT TITLE
-// =====================================================
-
-function updateTitleFromMessage(text) {
+function updateChatTitle(text) {
 
     if (!currentConversation) {
         return;
@@ -338,11 +378,185 @@ function updateTitleFromMessage(text) {
 }
 
 // =====================================================
-// DELETE ONE CONVERSATION
-// NO ALERT / NO CONFIRM
+// CUSTOM DELETE DIALOG
+// =====================================================
+
+function showDeleteDialog(
+    title,
+    message,
+    onDelete
+) {
+
+    const existing =
+        document.getElementById(
+            "deleteDialog"
+        );
+
+    if (existing) {
+        existing.remove();
+    }
+
+    const overlay =
+        document.createElement(
+            "div"
+        );
+
+    overlay.id =
+        "deleteDialog";
+
+    overlay.className =
+        "delete-dialog-overlay";
+
+    overlay.innerHTML = `
+        <div
+            class="delete-dialog"
+            role="dialog"
+            aria-modal="true"
+        >
+
+            <div class="delete-dialog-icon">
+                🗑
+            </div>
+
+            <h3>
+                ${escapeHtml(title)}
+            </h3>
+
+            <p>
+                ${escapeHtml(
+                    message ||
+                    "This action cannot be undone."
+                )}
+            </p>
+
+            <div class="delete-dialog-actions">
+
+                <button
+                    id="cancelDeleteButton"
+                    type="button"
+                    class="delete-cancel-button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    id="confirmDeleteButton"
+                    type="button"
+                    class="delete-confirm-button"
+                >
+                    Delete
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(
+        overlay
+    );
+
+    const cancelButton =
+        document.getElementById(
+            "cancelDeleteButton"
+        );
+
+    const confirmButton =
+        document.getElementById(
+            "confirmDeleteButton"
+        );
+
+    function closeDialog() {
+
+        overlay.remove();
+
+        document.removeEventListener(
+            "keydown",
+            handleEscape
+        );
+    }
+
+    function handleEscape(event) {
+
+        if (
+            event.key === "Escape"
+        ) {
+            closeDialog();
+        }
+    }
+
+    cancelButton.addEventListener(
+        "click",
+        closeDialog
+    );
+
+    confirmButton.addEventListener(
+        "click",
+        () => {
+
+            closeDialog();
+
+            if (
+                typeof onDelete ===
+                "function"
+            ) {
+                onDelete();
+            }
+        }
+    );
+
+    overlay.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                overlay
+            ) {
+                closeDialog();
+            }
+        }
+    );
+
+    document.addEventListener(
+        "keydown",
+        handleEscape
+    );
+
+    setTimeout(
+        () => {
+            confirmButton.focus();
+        },
+        50
+    );
+}
+
+// =====================================================
+// DELETE INDIVIDUAL CHAT
 // =====================================================
 
 function deleteConversation(id) {
+
+    const chat =
+        conversations.find(
+            conversation =>
+                conversation.id === id
+        );
+
+    if (!chat) {
+        return;
+    }
+
+    showDeleteDialog(
+        `Delete "${chat.title || "New Chat"}"?`,
+        "This conversation will be permanently deleted.",
+        () => {
+            performDeleteConversation(id);
+        }
+    );
+}
+
+function performDeleteConversation(id) {
 
     const index =
         conversations.findIndex(
@@ -367,7 +581,7 @@ function deleteConversation(id) {
 
     if (deletingCurrent) {
 
-        if (conversations.length > 0) {
+        if (conversations.length) {
 
             conversations.sort(
                 (a, b) =>
@@ -386,9 +600,12 @@ function deleteConversation(id) {
             conversations.push(
                 currentConversation
             );
+
+            saveConversations();
         }
 
-        pendingAttachment = null;
+        pendingAttachment =
+            null;
 
         clearAttachmentPreview();
 
@@ -414,7 +631,8 @@ function renderChatHistory() {
         return;
     }
 
-    chatHistory.innerHTML = "";
+    chatHistory.innerHTML =
+        "";
 
     if (!conversations.length) {
 
@@ -477,7 +695,7 @@ function renderChatHistory() {
                 <span class="history-title">
                     ${escapeHtml(
                         chat.title ||
-                            "New Chat"
+                        "New Chat"
                     )}
                 </span>
             `;
@@ -546,7 +764,7 @@ function renderChatHistory() {
 }
 
 // =====================================================
-// RENDER CURRENT CONVERSATION
+// RENDER CONVERSATION
 // =====================================================
 
 function renderConversation() {
@@ -588,7 +806,7 @@ function renderConversation() {
 }
 
 // =====================================================
-// ADD MESSAGE TO UI
+// ADD MESSAGE
 // =====================================================
 
 function addMessage(
@@ -616,6 +834,7 @@ function addMessage(
         attachment?.type ===
             "image" &&
         attachment.data
+
             ? `
                 <div class="attached-image">
                     <img
@@ -624,20 +843,25 @@ function addMessage(
                     >
                 </div>
               `
+
             : "";
 
     const speakHtml =
         role === "assistant"
+
             ? `
                 <div class="message-actions">
+
                     <button
                         class="speak-button"
                         type="button"
                     >
                         🔊 Read aloud
                     </button>
+
                 </div>
               `
+
             : "";
 
     wrapper.innerHTML = `
@@ -645,8 +869,8 @@ function addMessage(
         <div class="message-label">
             ${
                 role === "user"
-                    ? "You"
-                    : "AI Assistant"
+                    ? "YOU"
+                    : "AI ASSISTANT"
             }
         </div>
 
@@ -675,7 +899,10 @@ function addMessage(
         </div>
     `;
 
-    if (role === "assistant") {
+    if (
+        role ===
+        "assistant"
+    ) {
 
         const speakButton =
             wrapper.querySelector(
@@ -751,7 +978,7 @@ function addLoadingMessage() {
     loading.innerHTML = `
 
         <div class="message-label">
-            AI Assistant
+            AI ASSISTANT
         </div>
 
         <div class="message-row">
@@ -763,11 +990,9 @@ function addLoadingMessage() {
             <div class="message-content-wrap">
 
                 <div class="message-bubble">
-
                     <span class="typing">
                         Thinking...
                     </span>
-
                 </div>
 
             </div>
@@ -785,14 +1010,11 @@ function addLoadingMessage() {
 
 function removeLoadingMessage() {
 
-    const loading =
-        document.getElementById(
+    document
+        .getElementById(
             "loadingMessage"
-        );
-
-    if (loading) {
-        loading.remove();
-    }
+        )
+        ?.remove();
 }
 
 // =====================================================
@@ -806,11 +1028,6 @@ async function sendMessage() {
     }
 
     if (!input) {
-
-        console.error(
-            "messageInput element was not found."
-        );
-
         return;
     }
 
@@ -833,8 +1050,10 @@ async function sendMessage() {
         text ||
         (
             attachment?.type ===
-            "image"
+                "image"
+
                 ? `Please analyze this image: ${attachment.name}`
+
                 : `Please analyze the uploaded file: ${
                       attachment?.name ||
                       "file"
@@ -844,31 +1063,42 @@ async function sendMessage() {
     const apiContent =
         attachment?.type ===
         "file"
+
             ? buildFilePrompt(
                   attachment,
                   text
               )
+
             : displayText;
 
-    updateTitleFromMessage(
+    updateChatTitle(
         displayText
     );
 
     const storedAttachment =
         attachment?.type ===
         "image"
+
             ? {
                   type: "image",
-                  name: attachment.name,
-                  mime: attachment.mime,
-                  data: attachment.data
+                  name:
+                      attachment.name,
+                  mime:
+                      attachment.mime,
+                  data:
+                      attachment.data
               }
+
             : attachment
+
             ? {
                   type: "file",
-                  name: attachment.name,
-                  mime: attachment.mime
+                  name:
+                      attachment.name,
+                  mime:
+                      attachment.mime
               }
+
             : null;
 
     currentConversation.messages.push(
@@ -891,9 +1121,12 @@ async function sendMessage() {
         currentConversation.lastImage =
             {
                 type: "image",
-                name: attachment.name,
-                mime: attachment.mime,
-                data: attachment.data
+                name:
+                    attachment.name,
+                mime:
+                    attachment.mime,
+                data:
+                    attachment.data
             };
     }
 
@@ -911,11 +1144,13 @@ async function sendMessage() {
     input.style.height =
         "auto";
 
-    pendingAttachment = null;
+    pendingAttachment =
+        null;
 
     clearAttachmentPreview();
 
-    isSending = true;
+    isSending =
+        true;
 
     if (sendButton) {
         sendButton.disabled =
@@ -939,32 +1174,29 @@ async function sendMessage() {
         const apiMessages =
             buildApiMessages();
 
-        console.log(
-            "Sending request to:",
-            API_URL
-        );
-
         const response =
             await fetch(
                 API_URL,
                 {
-                    method: "POST",
+                    method:
+                        "POST",
 
                     headers: {
                         "Content-Type":
                             "application/json"
                     },
 
-                    body: JSON.stringify(
-                        {
-                            messages:
-                                apiMessages,
+                    body:
+                        JSON.stringify(
+                            {
+                                messages:
+                                    apiMessages,
 
-                            session_id:
-                                currentConversation
-                                    .sessionId
-                        }
-                    )
+                                session_id:
+                                    currentConversation
+                                        .sessionId
+                            }
+                        )
                 }
             );
 
@@ -973,17 +1205,8 @@ async function sendMessage() {
 
         removeLoadingMessage();
 
-        console.log(
-            "Backend status:",
-            response.status
-        );
-
-        console.log(
-            "Backend response:",
-            rawResponse
-        );
-
-        let data = null;
+        let data =
+            null;
 
         try {
 
@@ -997,8 +1220,7 @@ async function sendMessage() {
         } catch {
 
             throw new Error(
-                `Backend returned invalid JSON (HTTP ${response.status}). ` +
-                `Make sure the backend is running at http://localhost:5000.`
+                `Backend returned invalid JSON (HTTP ${response.status}).`
             );
         }
 
@@ -1019,8 +1241,11 @@ async function sendMessage() {
 
         currentConversation.messages.push(
             {
-                role: "assistant",
-                content: reply
+                role:
+                    "assistant",
+
+                content:
+                    reply
             }
         );
 
@@ -1052,21 +1277,23 @@ async function sendMessage() {
 
         removeLoadingMessage();
 
-        const errorMessage =
-            error?.message ||
-            "Something went wrong.";
-
         addMessage(
             "assistant",
+
             `Sorry, I couldn't get a response.
 
-Error: ${errorMessage}`,
+Error: ${
+                error?.message ||
+                "Something went wrong."
+            }`,
+
             false
         );
 
     } finally {
 
-        isSending = false;
+        isSending =
+            false;
 
         if (sendButton) {
             sendButton.disabled =
@@ -1098,61 +1325,67 @@ function buildApiMessages() {
     }
 
     return currentConversation.messages
-        .map((message, index) => {
+        .map(
+            (
+                message,
+                index
+            ) => {
 
-            const isLastUserMessage =
-                message.role ===
-                    "user" &&
-                index ===
+                const isLast =
+                    message.role ===
+                        "user" &&
+                    index ===
+                        currentConversation
+                            .messages
+                            .length -
+                            1;
+
+                if (
+                    isLast &&
                     currentConversation
-                        .messages.length -
-                        1;
+                        .lastImage
+                ) {
 
-            if (
-                isLastUserMessage &&
-                currentConversation.lastImage
-            ) {
+                    return {
+
+                        role: "user",
+
+                        content: [
+
+                            {
+                                type:
+                                    "text",
+
+                                text:
+                                    message.content
+                            },
+
+                            {
+                                type:
+                                    "image_url",
+
+                                image_url: {
+
+                                    url:
+                                        currentConversation
+                                            .lastImage
+                                            .data
+                                }
+                            }
+                        ]
+                    };
+                }
 
                 return {
 
-                    role: "user",
+                    role:
+                        message.role,
 
-                    content: [
-
-                        {
-                            type: "text",
-
-                            text:
-                                message.content
-                        },
-
-                        {
-                            type:
-                                "image_url",
-
-                            image_url: {
-
-                                url:
-                                    currentConversation
-                                        .lastImage
-                                        .data
-                            }
-                        }
-
-                    ]
+                    content:
+                        message.content
                 };
             }
-
-            return {
-
-                role:
-                    message.role,
-
-                content:
-                    message.content
-            };
-
-        })
+        )
         .slice(-20);
 }
 
@@ -1165,14 +1398,9 @@ async function handleFile(file) {
     if (!file) {
         return;
     }
-
-    try {
-
-        // ---------------------------------------------
+try {
         // IMAGE
-        // ---------------------------------------------
-
-        if (
+  if (
             file.type &&
             file.type.startsWith(
                 "image/"
@@ -1184,9 +1412,13 @@ async function handleFile(file) {
                 MAX_IMAGE_BYTES
             ) {
 
-                throw new Error(
-                    "Please choose an image smaller than 2.5 MB."
+                addMessage(
+                    "assistant",
+                    "Please choose an image smaller than 2.5 MB.",
+                    false
                 );
+
+                return;
             }
 
             const data =
@@ -1194,16 +1426,19 @@ async function handleFile(file) {
                     file
                 );
 
-            pendingAttachment = {
+            pendingAttachment =
+                {
+                    type:
+                        "image",
 
-                type: "image",
+                    name:
+                        file.name,
 
-                name: file.name,
+                    mime:
+                        file.type,
 
-                mime: file.type,
-
-                data
-            };
+                    data
+                };
 
             showAttachmentPreview(
                 pendingAttachment
@@ -1212,10 +1447,7 @@ async function handleFile(file) {
             return;
         }
 
-        // ---------------------------------------------
         // TEXT FILE
-        // ---------------------------------------------
-
         const textLike =
             /\.(txt|md|csv|json|js|html|css|xml|log)$/i.test(
                 file.name
@@ -1229,13 +1461,9 @@ async function handleFile(file) {
                 await readAsText(
                     file
                 );
-
         }
 
-        // ---------------------------------------------
         // PDF / DOCX
-        // ---------------------------------------------
-
         else if (
             file.type ===
                 "application/pdf" ||
@@ -1259,15 +1487,19 @@ async function handleFile(file) {
                 await fetch(
                     EXTRACT_URL,
                     {
-                        method: "POST",
-                        body: formData
+                        method:
+                            "POST",
+
+                        body:
+                            formData
                     }
                 );
 
             const rawResponse =
                 await response.text();
 
-            let data = null;
+            let data =
+                null;
 
             try {
 
@@ -1298,16 +1530,13 @@ async function handleFile(file) {
 
             text =
                 data.text || "";
-        }
 
-        // ---------------------------------------------
-        // UNSUPPORTED
-        // ---------------------------------------------
+        }
 
         else {
 
             throw new Error(
-                "Supported files: TXT, MD, CSV, JSON, JS, HTML, CSS, XML, PDF and DOCX."
+                "Supported files: TXT, MD, CSV, JSON, JS, HTML, CSS, XML, LOG, PDF and DOCX."
             );
         }
 
@@ -1317,18 +1546,20 @@ async function handleFile(file) {
                 MAX_TEXT_CHARS
             );
 
-        pendingAttachment = {
+        pendingAttachment =
+            {
+                type:
+                    "file",
 
-            type: "file",
+                name:
+                    file.name,
 
-            name: file.name,
+                mime:
+                    file.type ||
+                    "application/octet-stream",
 
-            mime:
-                file.type ||
-                "application/octet-stream",
-
-            text
-        };
+                text
+            };
 
         showAttachmentPreview(
             pendingAttachment
@@ -1341,97 +1572,109 @@ async function handleFile(file) {
             error
         );
 
-        // No alert popup.
-        // Show the error in the chat instead.
         addMessage(
             "assistant",
+
             `File error: ${
                 error?.message ||
                 "Could not process this file."
             }`,
+
             false
         );
 
-        pendingAttachment = null;
+        pendingAttachment =
+            null;
 
         clearAttachmentPreview();
 
     } finally {
 
         if (fileInput) {
-            fileInput.value = "";
+            fileInput.value =
+                "";
         }
     }
 }
 
 // =====================================================
-// READ TEXT FILE
+// FILE READERS
 // =====================================================
 
 function readAsText(file) {
 
     return new Promise(
-        (resolve, reject) => {
+        (
+            resolve,
+            reject
+        ) => {
 
             const reader =
                 new FileReader();
 
-            reader.onload = () => {
+            reader.onload =
+                () => {
 
-                resolve(
-                    String(
-                        reader.result ||
-                            ""
-                    )
-                );
-            };
+                    resolve(
+                        String(
+                            reader.result ||
+                                ""
+                        )
+                    );
+                };
 
-            reader.onerror = () => {
+            reader.onerror =
+                () => {
 
-                reject(
-                    new Error(
-                        "Could not read the file."
-                    )
-                );
-            };
+                    reject(
+                        new Error(
+                            "Could not read the file."
+                        )
+                    );
+                };
 
-            reader.readAsText(file);
+            reader.readAsText(
+                file
+            );
         }
     );
 }
 
-// =====================================================
-// READ IMAGE
-// =====================================================
-
 function readAsDataURL(file) {
 
     return new Promise(
-        (resolve, reject) => {
+        (
+            resolve,
+            reject
+        ) => {
 
             const reader =
                 new FileReader();
 
-            reader.onload = () => {
+            reader.onload =
+                () => {
 
-                resolve(
-                    String(
-                        reader.result ||
-                            ""
-                    )
-                );
-            };
+                    resolve(
+                        String(
+                            reader.result ||
+                                ""
+                        )
+                    );
+                };
 
-            reader.onerror = () => {
+            reader.onerror =
+                () => {
 
-                reject(
-                    new Error(
-                        "Could not read the image."
-                    )
-                );
-            };
+                    reject(
+                        new Error(
+                            "Could not read the image."
+                        )
+                    );
+                };
 
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(
+                file
+            );
         }
     );
 }
@@ -1567,7 +1810,10 @@ function speakText(
 ) {
 
     if (
-        !("speechSynthesis" in window)
+        !(
+            "speechSynthesis" in
+            window
+        )
     ) {
 
         addMessage(
@@ -1597,29 +1843,36 @@ function speakText(
             cleanText
         );
 
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    utterance.rate =
+        1;
+
+    utterance.pitch =
+        1;
 
     if (button) {
         button.textContent =
             "⏳ Reading...";
     }
 
-    utterance.onend = () => {
+    utterance.onend =
+        () => {
 
-        if (button) {
-            button.textContent =
-                "🔊 Read aloud";
-        }
-    };
+            if (button) {
 
-    utterance.onerror = () => {
+                button.textContent =
+                    "🔊 Read aloud";
+            }
+        };
 
-        if (button) {
-            button.textContent =
-                "🔊 Read aloud";
-        }
-    };
+    utterance.onerror =
+        () => {
+
+            if (button) {
+
+                button.textContent =
+                    "🔊 Read aloud";
+            }
+        };
 
     window.speechSynthesis.speak(
         utterance
@@ -1641,7 +1894,7 @@ function setupVoiceInput() {
         if (micButton) {
 
             micButton.title =
-                "Voice input is not supported in this browser";
+                "Voice input is not supported in this browser.";
         }
 
         return;
@@ -1659,25 +1912,26 @@ function setupVoiceInput() {
     recognition.continuous =
         false;
 
-    recognition.onstart = () => {
+    recognition.onstart =
+        () => {
 
-        isListening =
-            true;
+            isListening =
+                true;
 
-        if (micButton) {
+            if (micButton) {
 
-            micButton.classList.add(
-                "listening"
-            );
-        }
+                micButton.classList.add(
+                    "listening"
+                );
+            }
 
-        if (voiceStatus) {
+            if (voiceStatus) {
 
-            voiceStatus.classList.remove(
-                "hidden"
-            );
-        }
-    };
+                voiceStatus.classList.remove(
+                    "hidden"
+                );
+            }
+        };
 
     recognition.onresult =
         event => {
@@ -1716,25 +1970,26 @@ function setupVoiceInput() {
             );
         };
 
-    recognition.onend = () => {
+    recognition.onend =
+        () => {
 
-        isListening =
-            false;
+            isListening =
+                false;
 
-        if (micButton) {
+            if (micButton) {
 
-            micButton.classList.remove(
-                "listening"
-            );
-        }
+                micButton.classList.remove(
+                    "listening"
+                );
+            }
 
-        if (voiceStatus) {
+            if (voiceStatus) {
 
-            voiceStatus.classList.add(
-                "hidden"
-            );
-        }
-    };
+                voiceStatus.classList.add(
+                    "hidden"
+                );
+            }
+        };
 }
 
 function toggleVoiceInput() {
@@ -1743,7 +1998,7 @@ function toggleVoiceInput() {
 
         addMessage(
             "assistant",
-            "Voice input is not supported in this browser. Try Google Chrome or Microsoft Edge.",
+            "Voice input is not supported in this browser. Try Chrome or Edge.",
             false
         );
 
@@ -1763,7 +2018,7 @@ function toggleVoiceInput() {
         } catch (error) {
 
             console.warn(
-                "Could not start speech recognition:",
+                "Could not start voice input:",
                 error
             );
         }
@@ -1797,9 +2052,9 @@ function clearChat() {
 
     clearAttachmentPreview();
 
-    renderConversation();
-
     saveConversations();
+
+    renderConversation();
 
     if (input) {
         input.focus();
@@ -1807,17 +2062,29 @@ function clearChat() {
 }
 
 // =====================================================
-// DELETE ALL HISTORY
-// NO ALERT / NO CONFIRM
+// DELETE ALL CHAT HISTORY
+// CUSTOM DIALOG
 // =====================================================
 
 function deleteAllHistory() {
+
+    showDeleteDialog(
+        "Delete all chat history?",
+        "All saved conversations will be permanently deleted.",
+        () => {
+            performDeleteAllHistory();
+        }
+    );
+}
+
+function performDeleteAllHistory() {
 
     localStorage.removeItem(
         STORAGE_KEY
     );
 
-    conversations = [];
+    conversations =
+        [];
 
     currentConversation =
         null;
@@ -1979,7 +2246,7 @@ if (clearHistoryButton) {
     );
 }
 
-// ATTACH FILE
+// FILE ATTACHMENT
 if (
     attachButton &&
     fileInput
@@ -2044,7 +2311,7 @@ if (sidebarOverlay) {
 }
 
 // =====================================================
-// INITIALIZATION
+// INITIALIZE
 // =====================================================
 
 setupVoiceInput();
