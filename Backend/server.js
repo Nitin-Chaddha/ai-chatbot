@@ -22,15 +22,27 @@ const app = express();
 
 const PORT = Number(process.env.PORT) || 5000;
 
-const OPENROUTER_API_KEY =
-    process.env.OPENROUTER_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// ======================================================
-// ONE MODEL FOR EVERYTHING
-// ======================================================
-
+// Model can be changed from .env.
+// Default is OpenRouter's free router.
 const MODEL =
-    "minimax/minimax-m3:free";
+    process.env.OPENROUTER_MODEL || "openrouter/free";
+
+// ======================================================
+// SERPER CONFIGURATION - 3 API KEYS
+// ======================================================
+
+const SERPER_API_KEYS = [
+    process.env.SERPER_API_KEY_1,
+    process.env.SERPER_API_KEY_2,
+    process.env.SERPER_API_KEY_3
+].filter(Boolean);
+
+let activeSerperKeyIndex = 0;
+
+const SERPER_ENDPOINT =
+    "https://google.serper.dev/search";
 
 // ======================================================
 // MIDDLEWARE
@@ -48,84 +60,76 @@ app.use(
 // FILE UPLOAD
 // ======================================================
 
-const uploadDirectory =
-    path.join(
-        __dirname,
-        "tmp_uploads"
-    );
+const uploadDirectory = path.join(
+    __dirname,
+    "tmp_uploads"
+);
 
 if (!fs.existsSync(uploadDirectory)) {
-    fs.mkdirSync(
-        uploadDirectory,
-        {
-            recursive: true
-        }
-    );
+    fs.mkdirSync(uploadDirectory, {
+        recursive: true
+    });
 }
 
-const upload =
-    multer({
-        dest: uploadDirectory,
+const upload = multer({
+    dest: uploadDirectory,
 
-        limits: {
-            fileSize:
-                12 * 1024 * 1024
-        }
-    });
+    limits: {
+        fileSize: 12 * 1024 * 1024
+    }
+});
 
 // ======================================================
 // API KEY CHECK
 // ======================================================
 
 if (!OPENROUTER_API_KEY) {
-
     console.error(
         "❌ OPENROUTER_API_KEY is missing in Backend/.env"
     );
+}
 
+if (SERPER_API_KEYS.length === 0) {
+    console.warn(
+        "⚠️ No Serper API keys configured. Web fallback will be unavailable."
+    );
+} else {
+    console.log(
+        `✅ ${SERPER_API_KEYS.length} Serper API key(s) configured.`
+    );
 }
 
 // ======================================================
-// CREATE MINIMAX MODEL
+// CREATE OPENROUTER MODEL
 // ======================================================
 
-const aiModel =
-    new ChatOpenAI({
+const aiModel = new ChatOpenAI({
+    model: MODEL,
+    apiKey: OPENROUTER_API_KEY,
 
-        model: MODEL,
+    temperature: 0.7,
 
-        apiKey:
-            OPENROUTER_API_KEY,
+    maxTokens: 2000,
 
-        temperature: 0.7,
+    configuration: {
+        baseURL:
+            "https://openrouter.ai/api/v1",
 
-        maxTokens: 2000,
+        defaultHeaders: {
+            "HTTP-Referer":
+                `http://localhost:${PORT}`,
 
-        configuration: {
-
-            baseURL:
-                "https://openrouter.ai/api/v1",
-
-            defaultHeaders: {
-
-                "HTTP-Referer":
-                    `http://localhost:${PORT}`,
-
-                "X-Title":
-                    "AI LLM Chatbot"
-
-            }
-
+            "X-Title":
+                "AI LLM Chatbot"
         }
-
-    });
+    }
+});
 
 // ======================================================
-// SYSTEM PROMPT
+// SYSTEM MESSAGE
 // ======================================================
 
-const systemMessage = {
-
+const normalSystemMessage = {
     role: "system",
 
     content: `
@@ -133,32 +137,33 @@ You are an intelligent and friendly AI assistant.
 
 Answer the user's question directly and accurately.
 
-For beginner questions, explain concepts in simple language.
+For beginner questions:
+- Explain concepts in simple language.
+- Give examples when useful.
 
 For programming questions:
-- provide working code
-- explain the code
-- mention where the code should be placed when useful
+- Provide working code.
+- Explain the code.
+- Mention where the code should be placed when useful.
 
 For academic questions:
-- provide clear explanations
-- use examples when useful
-- structure answers neatly
+- Provide clear explanations.
+- Use examples.
+- Structure the answer neatly.
 
 When the user uploads an image:
-- inspect the image carefully
-- understand its visible text, diagrams, questions and objects
-- answer questions based on the image
+- Inspect the image carefully.
+- Understand visible text, diagrams, questions and objects.
+- Answer questions based on the image.
 
 When the user uploads a file:
-- use the extracted file content as context
-- answer questions using that content
+- Use the extracted file content as context.
+- Answer questions using that content.
 
-Do not claim to see or access something that was not provided.
-
-Do not invent facts.
-
-Be helpful, concise and clear.
+Important:
+- Do not invent facts.
+- Do not claim to see something that was not provided.
+- Be helpful, concise and clear.
 `
 };
 
@@ -167,101 +172,69 @@ Be helpful, concise and clear.
 // ======================================================
 
 function normalizeReply(content) {
-
-    if (
-        typeof content ===
-        "string"
-    ) {
-
+    if (typeof content === "string") {
         return content;
-
     }
 
-    if (
-        Array.isArray(content)
-    ) {
-
+    if (Array.isArray(content)) {
         return content
-            .map(part => {
-
-                if (
-                    typeof part ===
-                    "string"
-                ) {
+            .map((part) => {
+                if (typeof part === "string") {
                     return part;
                 }
 
                 if (
                     part &&
-                    typeof part.text ===
-                    "string"
+                    typeof part.text === "string"
                 ) {
                     return part.text;
                 }
 
                 return "";
-
             })
             .join("");
-
     }
 
     if (
         content &&
-        typeof content.text ===
-        "string"
+        typeof content.text === "string"
     ) {
-
         return content.text;
-
     }
 
     return "";
-
 }
 
 // ======================================================
-// VALIDATE CHAT MESSAGES
+// SANITIZE CHAT MESSAGES
 // ======================================================
 
 function sanitizeMessages(messages) {
-
-    if (
-        !Array.isArray(messages)
-    ) {
-
+    if (!Array.isArray(messages)) {
         return [];
-
     }
 
     return messages
-        .filter(message => {
-
+        .filter((message) => {
             if (
                 !message ||
                 ![
                     "user",
                     "assistant",
                     "system"
-                ].includes(
-                    message.role
-                )
+                ].includes(message.role)
             ) {
-
                 return false;
-
             }
 
             if (
                 typeof message.content ===
                 "string"
             ) {
-
                 return (
                     message.content.trim()
                         .length > 0
                 );
-
             }
 
             if (
@@ -269,168 +242,419 @@ function sanitizeMessages(messages) {
                     message.content
                 )
             ) {
-
                 return (
                     message.content.length > 0
                 );
-
             }
 
             return false;
-
         })
         .slice(-20);
-
 }
 
 // ======================================================
-// CHECK FOR IMAGE
+// CHECK IMAGE
 // ======================================================
 
 function containsImage(messages) {
-
-    return messages.some(
-        message => {
-
-            if (
-                !Array.isArray(
-                    message?.content
-                )
-            ) {
-
-                return false;
-
-            }
-
-            return message.content.some(
-                part =>
-                    part?.type ===
-                    "image_url"
-            );
-
-        }
-    );
-
-}
-
-// ======================================================
-// CHECK RATE LIMIT
-// ======================================================
-
-function isRateLimitError(error) {
-
-    const status =
-        error?.status ||
-        error?.statusCode ||
-        error?.response?.status;
-
-    const message =
-        String(
-            error?.message ||
-            error ||
-            ""
-        ).toLowerCase();
-
-    return (
-        Number(status) === 429 ||
-        message.includes("429") ||
-        message.includes(
-            "rate limit"
-        ) ||
-        message.includes(
-            "rate_limit"
-        ) ||
-        message.includes(
-            "model_rate_limit"
-        ) ||
-        message.includes(
-            "too many requests"
-        )
-    );
-
-}
-
-// ======================================================
-// WAIT
-// ======================================================
-
-function wait(ms) {
-
-    return new Promise(
-        resolve =>
-            setTimeout(
-                resolve,
-                ms
+    return messages.some((message) => {
+        if (
+            !Array.isArray(
+                message?.content
             )
-    );
+        ) {
+            return false;
+        }
 
+        return message.content.some(
+            (part) =>
+                part?.type ===
+                "image_url"
+        );
+    });
 }
 
 // ======================================================
-// CALL MINIMAX
+// GET TEXT QUERY
 // ======================================================
 
-async function callMiniMax(
-    messages
-) {
+function getSearchText(messages) {
+    const userMessages =
+        messages.filter(
+            (message) =>
+                message.role === "user"
+        );
 
-    const maxAttempts = 3;
+    const lastUser =
+        userMessages[
+            userMessages.length - 1
+        ];
+
+    if (!lastUser) {
+        return "";
+    }
+
+    if (
+        typeof lastUser.content ===
+        "string"
+    ) {
+        return lastUser.content.trim();
+    }
+
+    if (
+        Array.isArray(
+            lastUser.content
+        )
+    ) {
+        return lastUser.content
+            .filter(
+                (part) =>
+                    part?.type === "text"
+            )
+            .map(
+                (part) =>
+                    part.text || ""
+            )
+            .join(" ")
+            .trim();
+    }
+
+    return "";
+}
+
+// ======================================================
+// SERPER ERROR CHECK
+// ======================================================
+
+function isSerperKeyError(status) {
+    const code = Number(status);
+
+    return [
+        401, // Invalid API key
+        402, // Credits/billing problem
+        403, // Forbidden
+        429  // Rate/usage limit
+    ].includes(code);
+}
+
+// ======================================================
+// OPENROUTER FIRST
+// ======================================================
+
+async function callOpenRouter(messages) {
+    console.log(
+        `🤖 Trying OpenRouter first using model: ${MODEL}`
+    );
+
+    const response =
+        await aiModel.invoke([
+            normalSystemMessage,
+            ...messages
+        ]);
+
+    const reply =
+        normalizeReply(
+            response?.content
+        ).trim();
+
+    if (!reply) {
+        throw new Error(
+            "OpenRouter returned an empty response."
+        );
+    }
+
+    return reply;
+}
+
+// ======================================================
+// SERPER SEARCH
+// ======================================================
+//
+// IMPORTANT:
+// Serper is called ONLY if OpenRouter fails.
+//
+// Key 1 → Key 2 → Key 3
+//
+// If a key returns 401 / 402 / 403 / 429,
+// the backend automatically tries the next key.
+// ======================================================
+
+async function searchWithSerper(query) {
+    if (
+        SERPER_API_KEYS.length === 0
+    ) {
+        throw new Error(
+            "No Serper API keys are configured."
+        );
+    }
+
+    const startingIndex =
+        activeSerperKeyIndex;
+
+    let lastError = null;
 
     for (
-        let attempt = 1;
-        attempt <= maxAttempts;
+        let attempt = 0;
+        attempt <
+        SERPER_API_KEYS.length;
         attempt++
     ) {
+        const keyIndex =
+            (
+                startingIndex +
+                attempt
+            ) %
+            SERPER_API_KEYS.length;
+
+        const apiKey =
+            SERPER_API_KEYS[
+                keyIndex
+            ];
 
         try {
-
             console.log(
-                `🤖 MiniMax M3 request ${attempt}/${maxAttempts}`
+                `🌐 Serper search using key ${keyIndex + 1}/${SERPER_API_KEYS.length}`
             );
 
             const response =
-                await aiModel.invoke(
-                    messages
+                await fetch(
+                    SERPER_ENDPOINT,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "X-API-KEY":
+                                apiKey,
+
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify(
+                            {
+                                q: query,
+
+                                gl: "in",
+
+                                hl: "en",
+
+                                num: 8
+                            }
+                        )
+                    }
                 );
 
-            return response;
+            if (!response.ok) {
+                const errorText =
+                    await response.text();
+
+                const error =
+                    new Error(
+                        `Serper returned ${response.status}: ${errorText}`
+                    );
+
+                error.status =
+                    response.status;
+
+                throw error;
+            }
+
+            const data =
+                await response.json();
+
+            // Remember the key that worked.
+            activeSerperKeyIndex =
+                keyIndex;
+
+            console.log(
+                `✅ Serper key ${keyIndex + 1} worked successfully.`
+            );
+
+            return data;
 
         } catch (error) {
+            lastError = error;
 
             console.error(
-                `MiniMax attempt ${attempt} failed:`,
+                `❌ Serper key ${keyIndex + 1} failed:`,
                 error?.message ||
                     error
             );
 
+            // Only rotate for key/credit/rate-limit
+            // related failures.
             if (
-                !isRateLimitError(error) ||
-                attempt === maxAttempts
+                !isSerperKeyError(
+                    error?.status
+                )
             ) {
-
                 throw error;
-
             }
 
-            const delay =
-                attempt === 1
-                    ? 2000
-                    : 5000;
+            // Move to next key.
+            activeSerperKeyIndex =
+                (
+                    keyIndex + 1
+                ) %
+                SERPER_API_KEYS.length;
 
             console.log(
-                `⏳ MiniMax rate-limited. Retrying in ${delay / 1000}s...`
+                `🔁 Switching to Serper key ${activeSerperKeyIndex + 1}`
             );
-
-            await wait(delay);
-
         }
-
     }
 
-    throw new Error(
-        "MiniMax request failed."
+    throw (
+        lastError ||
+        new Error(
+            "All Serper API keys failed."
+        )
     );
+}
 
+// ======================================================
+// COMPACT SEARCH RESULTS
+// ======================================================
+
+function compactSearchResults(data) {
+    const organic =
+        Array.isArray(data?.organic)
+            ? data.organic
+            : [];
+
+    return organic
+        .slice(0, 8)
+        .map(
+            (item, index) => ({
+                rank: index + 1,
+
+                title:
+                    item?.title || "",
+
+                link:
+                    item?.link || "",
+
+                snippet:
+                    item?.snippet || "",
+
+                date:
+                    item?.date || ""
+            })
+        );
+}
+
+// ======================================================
+// BUILD ANSWER FROM SERPER
+// ======================================================
+
+function buildSerperFallbackAnswer(
+    data
+) {
+    const answerBox =
+        data?.answerBox || {};
+
+    const knowledgeGraph =
+        data?.knowledgeGraph || {};
+
+    const organic =
+        Array.isArray(data?.organic)
+            ? data.organic
+            : [];
+
+    // ------------------------------------------
+    // GOOGLE ANSWER BOX
+    // ------------------------------------------
+
+    if (
+        answerBox.answer
+    ) {
+        return answerBox.answer
+            .trim();
+    }
+
+    if (
+        answerBox.snippet
+    ) {
+        return answerBox.snippet
+            .trim();
+    }
+
+    // ------------------------------------------
+    // KNOWLEDGE GRAPH
+    // ------------------------------------------
+
+    if (
+        knowledgeGraph.description
+    ) {
+        let answer =
+            knowledgeGraph
+                .description
+                .trim();
+
+        if (
+            knowledgeGraph.title
+        ) {
+            answer =
+                `${knowledgeGraph.title}: ${answer}`;
+        }
+
+        return answer;
+    }
+
+    // ------------------------------------------
+    // GOOGLE SEARCH RESULTS
+    // ------------------------------------------
+
+    const usable =
+        organic
+            .filter(
+                (item) =>
+                    item?.title ||
+                    item?.snippet
+            )
+            .slice(0, 5);
+
+    if (!usable.length) {
+        return (
+            "I could not find a useful answer from Google search results."
+        );
+    }
+
+    const lines =
+        usable.map(
+            (item, index) => {
+                const title =
+                    item.title ||
+                    `Result ${index + 1}`;
+
+                const snippet =
+                    item.snippet ||
+                    "";
+
+                const link =
+                    item.link || "";
+
+                return (
+                    `${index + 1}. ${title}` +
+                    (
+                        snippet
+                            ? `\n${snippet}`
+                            : ""
+                    ) +
+                    (
+                        link
+                            ? `\n${link}`
+                            : ""
+                    )
+                );
+            }
+        );
+
+    return (
+        "I couldn't get an answer from the AI model, " +
+        "so I searched Google. Here are the most relevant results:\n\n" +
+        lines.join("\n\n")
+    );
 }
 
 // ======================================================
@@ -440,9 +664,7 @@ async function callMiniMax(
 app.get(
     "/health",
     (req, res) => {
-
         res.json({
-
             success: true,
 
             status: "running",
@@ -453,14 +675,18 @@ app.get(
             framework:
                 "LangChain.js",
 
-            model:
-                MODEL,
+            model: MODEL,
 
             imageSupport:
-                true
+                true,
 
+            webFallback:
+                SERPER_API_KEYS.length >
+                0,
+
+            serperKeysConfigured:
+                SERPER_API_KEYS.length
         });
-
     }
 );
 
@@ -471,16 +697,12 @@ app.get(
 app.get(
     "/api/chat",
     (req, res) => {
-
         res.json({
-
             success: false,
 
             message:
                 "Use POST /api/chat."
-
         });
-
     }
 );
 
@@ -491,33 +713,26 @@ app.get(
 app.post(
     "/api/chat",
     async (req, res) => {
-
         try {
+            // ==========================================
+            // OPENROUTER API KEY CHECK
+            // ==========================================
 
-            // ------------------------------------------
-            // CHECK API KEY
-            // ------------------------------------------
-
-            if (
-                !OPENROUTER_API_KEY
-            ) {
-
+            if (!OPENROUTER_API_KEY) {
                 return res
                     .status(500)
                     .json({
-
-                        success: false,
+                        success:
+                            false,
 
                         error:
                             "OPENROUTER_API_KEY is missing in Backend/.env"
-
                     });
-
             }
 
-            // ------------------------------------------
-            // GET MESSAGES
-            // ------------------------------------------
+            // ==========================================
+            // SANITIZE MESSAGES
+            // ==========================================
 
             const safeMessages =
                 sanitizeMessages(
@@ -527,141 +742,279 @@ app.post(
             if (
                 !safeMessages.length
             ) {
-
                 return res
                     .status(400)
                     .json({
-
-                        success: false,
+                        success:
+                            false,
 
                         error:
                             "No valid messages were provided."
-
                     });
-
             }
-
-            // ------------------------------------------
-            // IMAGE DETECTION
-            // ------------------------------------------
 
             const imageRequest =
                 containsImage(
                     safeMessages
                 );
 
-            if (imageRequest) {
+            const searchQuery =
+                getSearchText(
+                    safeMessages
+                );
+
+            console.log(
+                imageRequest
+                    ? "🖼️ Image request detected"
+                    : "💬 Text request detected"
+            );
+
+            // ==========================================
+            // STEP 1
+            // ALWAYS TRY OPENROUTER FIRST
+            // ==========================================
+
+            try {
+                const reply =
+                    await callOpenRouter(
+                        safeMessages
+                    );
+
+                // IMPORTANT:
+                // If OpenRouter succeeds,
+                // STOP HERE.
+                //
+                // Serper is NOT called.
+                // ======================================
 
                 console.log(
-                    "🖼️ Image detected"
+                    "✅ OpenRouter answered successfully."
                 );
 
                 console.log(
-                    "Using MiniMax M3 multimodal input"
+                    "🚫 Serper was NOT used."
                 );
 
-            } else {
+                return res.json({
+                    success:
+                        true,
+
+                    reply,
+
+                    modelUsed:
+                        MODEL,
+
+                    provider:
+                        "OpenRouter",
+
+                    framework:
+                        "LangChain.js",
+
+                    multimodal:
+                        imageRequest,
+
+                    webUsed:
+                        false
+                });
+
+            } catch (
+                openRouterError
+            ) {
+
+                // ======================================
+                // OPENROUTER FAILED
+                // NOW AND ONLY NOW USE SERPER
+                // ======================================
+
+                console.error(
+                    "❌ OpenRouter failed."
+                );
+
+                console.error(
+                    "Reason:",
+                    openRouterError
+                        ?.message ||
+                        openRouterError
+                );
 
                 console.log(
-                    "💬 Text request detected"
+                    "🌐 Starting Serper fallback..."
                 );
-
             }
 
-            // ------------------------------------------
-            // BUILD FINAL MESSAGES
-            // ------------------------------------------
+            // ==========================================
+            // STEP 2
+            // SERPER FALLBACK
+            // ==========================================
 
-            const finalMessages = [
-                systemMessage,
-                ...safeMessages
-            ];
+            if (
+                SERPER_API_KEYS.length ===
+                0
+            ) {
+                return res
+                    .status(503)
+                    .json({
+                        success:
+                            false,
 
-            // ------------------------------------------
-            // CALL MINIMAX
-            // ------------------------------------------
+                        error:
+                            "OpenRouter failed and no Serper API keys are configured.",
 
-            const response =
-                await callMiniMax(
-                    finalMessages
-                );
-
-            // ------------------------------------------
-            // GET RESPONSE TEXT
-            // ------------------------------------------
-
-            const reply =
-                normalizeReply(
-                    response?.content
-                ).trim();
-
-            if (!reply) {
-
-                throw new Error(
-                    "MiniMax returned an empty response."
-                );
-
+                        webUsed:
+                            false
+                    });
             }
 
-            // ------------------------------------------
-            // RETURN RESPONSE
-            // ------------------------------------------
+            if (
+                !searchQuery
+            ) {
+                return res
+                    .status(503)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            "OpenRouter failed, but there is no text query available for Google fallback.",
+
+                        webUsed:
+                            false
+                    });
+            }
+
+            let searchData;
+
+            try {
+                searchData =
+                    await searchWithSerper(
+                        searchQuery
+                    );
+
+            } catch (
+                serperError
+            ) {
+
+                console.error(
+                    "❌ All configured Serper keys failed:",
+                    serperError
+                        ?.message ||
+                        serperError
+                );
+
+                return res
+                    .status(502)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            "OpenRouter failed and all 3 Serper API keys are unavailable.",
+
+                        details:
+                            serperError
+                                ?.message ||
+                            "Serper request failed",
+
+                        webUsed:
+                            true
+                    });
+            }
+
+            // ==========================================
+            // EXTRACT RESULTS
+            // ==========================================
+
+            const searchResults =
+                compactSearchResults(
+                    searchData
+                );
+
+            if (
+                !searchResults.length &&
+                !searchData?.answerBox &&
+                !searchData?.knowledgeGraph
+            ) {
+                return res
+                    .status(404)
+                    .json({
+                        success:
+                            false,
+
+                        error:
+                            "OpenRouter failed and Google returned no useful search results.",
+
+                        webUsed:
+                            true
+                    });
+            }
+
+            // ==========================================
+            // STEP 3
+            // RETURN SERPER ANSWER
+            // ==========================================
+
+            const fallbackReply =
+                buildSerperFallbackAnswer(
+                    searchData
+                );
+
+            console.log(
+                "✅ Serper fallback completed successfully."
+            );
 
             return res.json({
+                success:
+                    true,
 
-                success: true,
-
-                reply,
+                reply:
+                    fallbackReply,
 
                 modelUsed:
-                    MODEL,
+                    null,
 
                 provider:
-                    "OpenRouter",
+                    "Serper Google Search",
 
                 framework:
-                    "LangChain.js",
+                    "LangChain.js + Serper fallback",
 
                 multimodal:
-                    imageRequest
+                    imageRequest,
 
+                webUsed:
+                    true,
+
+                sources:
+                    searchResults.map(
+                        (item) => ({
+                            title:
+                                item.title,
+
+                            link:
+                                item.link
+                        })
+                    )
             });
 
         } catch (error) {
 
             console.error(
-                "❌ MiniMax error:",
+                "❌ Chat error:",
                 error?.message ||
                     error
             );
 
-            const rateLimited =
-                isRateLimitError(
-                    error
-                );
-
             return res
-                .status(
-                    rateLimited
-                        ? 429
-                        : 500
-                )
+                .status(500)
                 .json({
-
-                    success: false,
+                    success:
+                        false,
 
                     error:
-                        rateLimited
-                            ? "MiniMax M3 is currently rate-limited. Please wait a few seconds and try again."
-                            : (
-                                error?.message ||
-                                "Failed to get a response from MiniMax M3."
-                              )
-
+                        error?.message ||
+                        "Failed to process the request."
                 });
-
         }
-
     }
 );
 
@@ -672,26 +1025,22 @@ app.post(
 app.post(
     "/api/extract-file",
     upload.single("file"),
-    async (req, res) => {
 
+    async (req, res) => {
         let tempPath =
             req.file?.path;
 
         try {
-
             if (!req.file) {
-
                 return res
                     .status(400)
                     .json({
-
-                        success: false,
+                        success:
+                            false,
 
                         error:
                             "No file was uploaded."
-
                     });
-
             }
 
             const originalName =
@@ -704,14 +1053,13 @@ app.post(
 
             let text = "";
 
-            // ------------------------------------------
+            // ==========================================
             // PDF
-            // ------------------------------------------
+            // ==========================================
 
             if (
                 extension === ".pdf"
             ) {
-
                 const buffer =
                     fs.readFileSync(
                         tempPath
@@ -723,71 +1071,67 @@ app.post(
                     );
 
                 text =
-                    parsed.text || "";
-
+                    parsed.text ||
+                    "";
             }
 
-            // ------------------------------------------
+            // ==========================================
             // DOCX
-            // ------------------------------------------
+            // ==========================================
 
             else if (
                 extension === ".docx"
             ) {
-
                 const result =
-                    await mammoth.extractRawText({
-                        path:
-                            tempPath
-                    });
+                    await mammoth.extractRawText(
+                        {
+                            path:
+                                tempPath
+                        }
+                    );
 
                 text =
-                    result.value || "";
-
+                    result.value ||
+                    "";
             }
 
-            // ------------------------------------------
-            // NORMAL TEXT FILE
-            // ------------------------------------------
+            // ==========================================
+            // NORMAL TEXT FILES
+            // ==========================================
 
             else {
-
                 text =
                     fs.readFileSync(
                         tempPath,
                         "utf8"
                     );
-
             }
 
-            // ------------------------------------------
+            // ==========================================
             // CHECK EMPTY
-            // ------------------------------------------
+            // ==========================================
 
             if (
                 !text.trim()
             ) {
-
                 return res
                     .status(422)
                     .json({
-
-                        success: false,
+                        success:
+                            false,
 
                         error:
                             "No readable text was found in this file."
-
                     });
-
             }
 
-            // ------------------------------------------
-            // RETURN TEXT
-            // ------------------------------------------
+            // ==========================================
+            // RETURN FILE CONTENT
+            // ==========================================
 
             return res.json({
-
-                success: true,
+                success:
+                    true,
 
                 filename:
                     originalName,
@@ -797,7 +1141,6 @@ app.post(
                         0,
                         60000
                     )
-
             });
 
         } catch (error) {
@@ -811,30 +1154,29 @@ app.post(
             return res
                 .status(500)
                 .json({
-
-                    success: false,
+                    success:
+                        false,
 
                     error:
                         "Could not extract text from this file."
-
                 });
 
         } finally {
 
+            // ==========================================
+            // DELETE TEMP FILE
+            // ==========================================
+
             if (tempPath) {
-
                 try {
-
                     fs.unlinkSync(
                         tempPath
                     );
-
-                } catch {}
-
+                } catch {
+                    // Ignore cleanup errors.
+                }
             }
-
         }
-
     }
 );
 
@@ -854,21 +1196,15 @@ app.use(
     )
 );
 
-// ======================================================
-// HOME PAGE
-// ======================================================
-
 app.get(
     "/",
     (req, res) => {
-
         res.sendFile(
             path.join(
                 frontendPath,
                 "index.html"
             )
         );
-
     }
 );
 
@@ -885,7 +1221,7 @@ app.listen(
         );
 
         console.log(
-            "        🤖 AI CHATBOT"
+            "             🤖 AI CHATBOT"
         );
 
         console.log(
@@ -897,39 +1233,51 @@ app.listen(
         );
 
         console.log(
-            `Health       : /health`
+            `Health       : http://localhost:${PORT}/health`
         );
 
         console.log(
-            `AI Provider  : OpenRouter`
+            "AI Provider  : OpenRouter"
         );
 
         console.log(
-            `Framework    : LangChain.js`
+            "Framework    : LangChain.js"
         );
 
         console.log(
-            `Model        : minimax/minimax-m3:free`
+            `Model        : ${MODEL}`
         );
 
         console.log(
-            `Text         : ✅`
+            `Serper keys  : ${SERPER_API_KEYS.length}`
         );
 
         console.log(
-            `Images       : ✅`
+            "Fallback     : OpenRouter → Serper"
         );
 
         console.log(
-            `Files        : ✅`
+            "Key rotation : Key 1 → Key 2 → Key 3"
         );
 
         console.log(
-            `Voice input  : ✅ Browser`
+            "Text         : ✅"
         );
 
         console.log(
-            `Text speech  : ✅ Browser`
+            "Images       : ✅"
+        );
+
+        console.log(
+            "Files        : ✅"
+        );
+
+        console.log(
+            "Voice input  : ✅ Browser"
+        );
+
+        console.log(
+            "Text speech  : ✅ Browser"
         );
 
         console.log(
